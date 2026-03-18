@@ -1,5 +1,6 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
+import AuthGuard from './components/auth/AuthGuard';
 import AppLayout from './components/layout/AppLayout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -16,44 +17,10 @@ import AdminUsers from './pages/admin/AdminUsers';
 import AdminDepartments from './pages/admin/AdminDepartments';
 import './index.css';
 
-// Inline AuthGuard with debug diagnostics for visibility
-function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { session, profile, loading } = useAuth();
-  const location = useLocation();
-
-  if (loading) {
-    return (
-      <div style={{ padding: 24, textAlign: 'left', fontFamily: 'monospace', background: '#ffebee', color: 'black' }}>
-        <h2>Loading Auth State... (Blocked)</h2>
-        <pre style={{ background: '#fff', padding: 12, border: '1px solid red' }}>
-          Branch: rendering loading
-          {'\n'}
-          Session ID: {session?.user?.id || 'null'}
-          {'\n'}
-          Profile ID: {profile?.id || 'null'}
-          {'\n'}
-          Profile Name: {profile?.full_name || 'null'}
-          {'\n'}
-          Profile Role: {profile?.role_code || 'null'}
-          {'\n'}
-          Loading state variable: {loading ? 'true' : 'false'}
-        </pre>
-      </div>
-    );
-  }
-
-  if (!session) {
-    console.log('[AuthGuard] Redirecting to /login branch taken');
-    return <Navigate to="/login" replace state={{ from: location }} />;
-  }
-
-  return <>{children}</>;
-}
-
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
+      <BrowserRouter basename={import.meta.env.BASE_URL}>
         <Routes>
           <Route path="/login" element={<Login />} />
 
@@ -79,6 +46,8 @@ function App() {
             <Route path="admin/users" element={<AdminUsers />} />
             <Route path="admin/departments" element={<AdminDepartments />} />
           </Route>
+
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
