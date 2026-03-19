@@ -1,19 +1,42 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Filter, Plus, Eye } from 'lucide-react';
-
-// Mock data for the UI
-const MOCK_REQUESTS = [
-  { id: '1', request_no: 'PR-0001', request_date: '2026-03-10', department: 'IT', supplier_name: 'Dell', grand_total: '$2,450.00', status: 'Draft' },
-  { id: '2', request_no: 'PR-0002', request_date: '2026-03-12', department: 'IT', supplier_name: 'AWS', grand_total: '$500.00', status: 'Submitted' },
-  { id: '3', request_no: 'PR-0003', request_date: '2026-03-14', department: 'IT', supplier_name: 'Adobe', grand_total: '$1,200.00', status: 'Approved' },
-  { id: '4', request_no: 'PR-0004', request_date: '2026-03-15', department: 'IT', supplier_name: 'Herman Miller', grand_total: '$3,500.00', status: 'Rejected' },
-];
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 
 export default function RequestList() {
   const navigate = useNavigate();
+  const { profile } = useAuth();
+  const [requests, setRequests] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+
+  useEffect(() => {
+    async function fetchRequests() {
+      if (!profile) return;
+      try {
+        let query = supabase
+          .from('purchase_requests')
+          .select('*, departments(name)')
+          .order('request_date', { ascending: false });
+
+        if (profile.role_code === 'REQUESTER') {
+          query = query.eq('requester_id', profile.id);
+        } else if (profile.role_code === 'APPROVER') {
+          query = query.eq('department_id', profile.department_id).neq('status', 'Draft');
+        } else if (profile.role_code === 'PROCUREMENT') {
+          query = query.in('status', ['Approved', 'Converted to PO']);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+        setRequests(data || []);
+      } catch (err) {
+        console.error('Error fetching requests', err);
+      }
+    }
+    fetchRequests();
+  }, [profile]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -25,6 +48,18 @@ export default function RequestList() {
       default: return 'bg-gray-100 text-gray-800';
     }
   };
+
+  const filteredRequests = requests.filter(req => {
+    const term = searchTerm.toLowerCase();
+    const deptName = req.departments?.name || '';
+    const matchesSearch = 
+      (req.request_no && req.request_no.toLowerCase().includes(term)) ||
+      (req.supplier_name && req.supplier_name.toLowerCase().includes(term)) ||
+      (deptName.toLowerCase().includes(term));
+      
+    const matchesStatus = statusFilter ? req.status === statusFilter : true;
+    return matchesSearch && matchesStatus;
+  });
 
   return (
     <div className="page-container" data-testid="pr-list-page">
@@ -46,7 +81,7 @@ export default function RequestList() {
           <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
           <input
             type="text"
-            placeholder="Search request number or supplier..."
+            placeholder="Search details..."
             style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.5rem', borderRadius: '0.375rem', border: '1px solid var(--border)', outline: 'none' }}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -85,13 +120,15 @@ export default function RequestList() {
             </tr>
           </thead>
           <tbody>
-            {MOCK_REQUESTS.map((req) => (
+            {filteredRequests.map((req) => (
               <tr key={req.id} style={{ borderBottom: '1px solid var(--border)' }} data-testid={`pr-list-row-${req.request_no}`}>
                 <td style={{ padding: '1rem', fontWeight: 500 }}>{req.request_no}</td>
                 <td style={{ padding: '1rem', color: 'var(--text-muted)' }}>{req.request_date}</td>
-                <td style={{ padding: '1rem' }}>{req.department}</td>
+                <td style={{ padding: '1rem' }}>{req.departments?.name || req.department_id}</td>
                 <td style={{ padding: '1rem' }}>{req.supplier_name}</td>
-                <td style={{ padding: '1rem', fontWeight: 500 }}>{req.grand_total}</td>
+                <td style={{ padding: '1rem', fontWeight: 500 }}>
+                  {new Intl.NumberFormat('en-US', { style: 'currency', currency: req.currency_code || 'USD' }).format(req.grand_total || 0)}
+                </td>
                 <td style={{ padding: '1rem' }}>
                   <span style={{
                     padding: '0.25rem 0.75rem',
@@ -118,6 +155,13 @@ export default function RequestList() {
                 </td>
               </tr>
             ))}
+            {filteredRequests.length === 0 && (
+              <tr>
+                <td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  No requests found.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
