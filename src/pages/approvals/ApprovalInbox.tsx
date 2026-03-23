@@ -1,25 +1,72 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Filter, Eye } from 'lucide-react';
-
-const MOCK_APPROVALS = [
-  { id: '2', request_no: 'PR-0002', request_date: '2026-03-12', department: 'IT', supplier_name: 'AWS', grand_total: '$500.00', status: 'Submitted' },
-  { id: '6', request_no: 'PR-0006', request_date: '2026-03-15', department: 'FIN', supplier_name: 'Intuit', grand_total: '$150.00', status: 'Submitted' },
-];
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 
 export default function ApprovalInbox() {
   const navigate = useNavigate();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const { profile } = useAuth();
 
-  const getStatusColor = (status: string) => {
-    switch(status) {
-      case 'Submitted': return 'bg-blue-100 text-blue-800';
-      case 'Approved': return 'bg-green-100 text-green-800';
-      case 'Rejected': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+  const [requests, setRequests]       = useState<any[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [fetchError, setFetchError]   = useState<string | null>(null);
+  const [searchTerm, setSearchTerm]   = useState('');
+  const [statusFilter, setStatusFilter] = useState('Submitted');
+
+  useEffect(() => {
+    async function fetchApprovals() {
+      if (!profile) return;
+      try {
+        setLoading(true);
+        setFetchError(null);
+
+        // Base query — exclude Drafts (not actionable for approvers)
+        let query = supabase
+          .from('purchase_requests')
+          .select('*, departments ( name )')
+          .neq('status', 'Draft')
+          .order('created_at', { ascending: false });
+
+        // APPROVER: scoped to their department by RLS (and we reflect it here).
+        // ADMIN: no department filter — sees all departments.
+        if (profile.role_code === 'APPROVER') {
+          query = query.eq('department_id', profile.department_id);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+        setRequests(data || []);
+      } catch (err: any) {
+        console.error('ApprovalInbox fetch error', err);
+        setFetchError(err.message || 'Failed to load approvals.');
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchApprovals();
+  }, [profile]);
+
+  const getStatusStyle = (status: string) => {
+    switch (status) {
+      case 'Submitted':       return { backgroundColor: '#dbeafe', color: '#1e40af' };
+      case 'Approved':        return { backgroundColor: '#dcfce7', color: '#166534' };
+      case 'Rejected':        return { backgroundColor: '#fee2e2', color: '#991b1b' };
+      case 'Converted to PO': return { backgroundColor: '#f3e8ff', color: '#6b21a8' };
+      default:                return { backgroundColor: '#f3f4f6', color: '#1f2937' };
     }
   };
+
+  const fmt = (val: number, currency: string) =>
+    new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD' }).format(val || 0);
+
+  const filtered = requests.filter(req => {
+    const matchSearch =
+      req.request_no?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      req.supplier_name?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchStatus = statusFilter === '' || req.status === statusFilter;
+    return matchSearch && matchStatus;
+  });
 
   return (
     <div className="page-container" data-testid="approval-list-page">
@@ -27,24 +74,25 @@ export default function ApprovalInbox() {
         <h1 className="page-title">Approval Inbox</h1>
       </div>
 
+      {/* Search + Filter */}
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
         <div style={{ position: 'relative', flex: 1, minWidth: '250px' }}>
           <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-          <input 
-            type="text" 
-            placeholder="Search request number or supplier..." 
+          <input
+            type="text"
+            placeholder="Search request number or supplier..."
             style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.5rem', borderRadius: '0.375rem', border: '1px solid var(--border)', outline: 'none' }}
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={e => setSearchTerm(e.target.value)}
             data-testid="approval-list-search-input"
           />
         </div>
-        <div style={{ position: 'relative', width: '200px' }}>
+        <div style={{ position: 'relative', width: '220px' }}>
           <Filter size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-          <select 
+          <select
             style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.5rem', borderRadius: '0.375rem', border: '1px solid var(--border)', outline: 'none', backgroundColor: 'white', appearance: 'none' }}
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={e => setStatusFilter(e.target.value)}
             data-testid="approval-list-status-filter"
           >
             <option value="">All Statuses</option>
@@ -55,6 +103,7 @@ export default function ApprovalInbox() {
         </div>
       </div>
 
+      {/* Table */}
       <div style={{ backgroundColor: 'var(--bg-surface)', borderRadius: '0.5rem', border: '1px solid var(--border)', overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead style={{ backgroundColor: 'var(--bg-main)', borderBottom: '1px solid var(--border)' }}>
@@ -69,30 +118,35 @@ export default function ApprovalInbox() {
             </tr>
           </thead>
           <tbody>
-            {MOCK_APPROVALS.map((req) => (
+            {loading && (
+              <tr>
+                <td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  Loading approvals...
+                </td>
+              </tr>
+            )}
+            {!loading && fetchError && (
+              <tr>
+                <td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: '#991b1b' }}>
+                  Error: {fetchError}
+                </td>
+              </tr>
+            )}
+            {!loading && !fetchError && filtered.map(req => (
               <tr key={req.id} style={{ borderBottom: '1px solid var(--border)' }} data-testid={`approval-list-row-${req.request_no}`}>
                 <td style={{ padding: '1rem', fontWeight: 500 }}>{req.request_no}</td>
                 <td style={{ padding: '1rem', color: 'var(--text-muted)' }}>{req.request_date}</td>
-                <td style={{ padding: '1rem' }}>{req.department}</td>
+                <td style={{ padding: '1rem' }}>{req.departments?.name || '—'}</td>
                 <td style={{ padding: '1rem' }}>{req.supplier_name}</td>
-                <td style={{ padding: '1rem', fontWeight: 500 }}>{req.grand_total}</td>
+                <td style={{ padding: '1rem', fontWeight: 500 }}>{fmt(req.grand_total, req.currency_code)}</td>
                 <td style={{ padding: '1rem' }}>
-                  <span style={{ 
-                    padding: '0.25rem 0.75rem', 
-                    borderRadius: '9999px', 
-                    fontSize: '0.875rem', 
-                    fontWeight: 500,
-                    ...getStatusColor(req.status).includes('bg-gray-100') ? { backgroundColor: '#f3f4f6', color: '#1f2937' } :
-                    getStatusColor(req.status).includes('bg-blue-100') ? { backgroundColor: '#dbeafe', color: '#1e40af' } :
-                    getStatusColor(req.status).includes('bg-green-100') ? { backgroundColor: '#dcfce7', color: '#166534' } :
-                    getStatusColor(req.status).includes('bg-red-100') ? { backgroundColor: '#fee2e2', color: '#991b1b' } :
-                    { backgroundColor: '#f3e8ff', color: '#6b21a8' }
-                  }}>
+                  <span style={{ padding: '0.25rem 0.75rem', borderRadius: '9999px', fontSize: '0.875rem', fontWeight: 500, ...getStatusStyle(req.status) }}>
                     {req.status}
                   </span>
                 </td>
                 <td style={{ padding: '1rem', textAlign: 'right' }}>
-                  <button 
+                  {/* Navigate with real Supabase UUID — ApprovalDetail fetches by this id */}
+                  <button
                     style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
                     onClick={() => navigate(`/approvals/${req.id}`)}
                   >
@@ -102,10 +156,10 @@ export default function ApprovalInbox() {
                 </td>
               </tr>
             ))}
-            {MOCK_APPROVALS.length === 0 && (
+            {!loading && !fetchError && filtered.length === 0 && (
               <tr>
                 <td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                  No pending approvals found.
+                  No approvals found.
                 </td>
               </tr>
             )}

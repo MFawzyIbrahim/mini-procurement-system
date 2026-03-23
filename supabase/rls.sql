@@ -60,6 +60,20 @@ ON public.profiles FOR UPDATE TO authenticated USING (public.get_current_user_ro
 CREATE POLICY "Admin can delete profiles"
 ON public.profiles FOR DELETE TO authenticated USING (public.get_current_user_role() = 'ADMIN');
 
+-- Scoped read: allow viewing a profile's full_name only when that profile
+-- is the requester on a purchase_request the current user can already see.
+-- The EXISTS subquery runs under the caller's purchase_requests RLS,
+-- so APPROVER only resolves names from their own department's requests,
+-- and ADMIN resolves all. The profiles table is NOT broadly opened.
+CREATE POLICY "Users can view requester profiles on visible purchase requests"
+ON public.profiles FOR SELECT TO authenticated USING (
+    EXISTS (
+        SELECT 1
+        FROM public.purchase_requests pr
+        WHERE pr.requester_id = id
+    )
+);
+
 -- ==============================================================================
 -- 3. Purchase Requests Policies
 -- ==============================================================================
@@ -220,15 +234,17 @@ LANGUAGE plpgsql
 SECURITY DEFINER SET search_path = public
 AS $$
 BEGIN
-    -- Verify the user is an APPROVER for this department, and the PR is Submitted
+    -- Allow ADMIN (any department) or APPROVER (same department only)
     IF NOT EXISTS (
-        SELECT 1 
+        SELECT 1
         FROM public.purchase_requests pr
-        JOIN public.profiles prof ON prof.department_id = pr.department_id
+        JOIN public.profiles prof ON prof.id = auth.uid()
         WHERE pr.id = p_request_id
           AND pr.status = 'Submitted'
-          AND prof.id = auth.uid()
-          AND prof.role_code = 'APPROVER'
+          AND (
+              prof.role_code = 'ADMIN'
+              OR (prof.role_code = 'APPROVER' AND prof.department_id = pr.department_id)
+          )
     ) THEN
         RAISE EXCEPTION 'Not authorized or request is not in Submitted state';
     END IF;
@@ -255,15 +271,17 @@ BEGIN
         RAISE EXCEPTION 'Rejection reason is required';
     END IF;
 
-    -- Verify the user is an APPROVER for this department, and the PR is Submitted
+    -- Allow ADMIN (any department) or APPROVER (same department only)
     IF NOT EXISTS (
-        SELECT 1 
+        SELECT 1
         FROM public.purchase_requests pr
-        JOIN public.profiles prof ON prof.department_id = pr.department_id
+        JOIN public.profiles prof ON prof.id = auth.uid()
         WHERE pr.id = p_request_id
           AND pr.status = 'Submitted'
-          AND prof.id = auth.uid()
-          AND prof.role_code = 'APPROVER'
+          AND (
+              prof.role_code = 'ADMIN'
+              OR (prof.role_code = 'APPROVER' AND prof.department_id = pr.department_id)
+          )
     ) THEN
         RAISE EXCEPTION 'Not authorized or request is not in Submitted state';
     END IF;
