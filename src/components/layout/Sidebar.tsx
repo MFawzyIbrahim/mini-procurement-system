@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, FileText, CheckSquare, ShoppingCart, Settings } from 'lucide-react';
+import { LayoutDashboard, FileText, CheckSquare, ShoppingCart, Settings, ClipboardCheck } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 export default function Sidebar() {
@@ -28,6 +28,13 @@ export default function Sidebar() {
           <NavLink to="/approvals" className="nav-link" data-testid="nav-approvals">
             <CheckSquare size={20} />
             <span>Approval Inbox</span>
+          </NavLink>
+        )}
+
+        {(role === 'PROCUREMENT' || role === 'ADMIN') && (
+          <NavLink to="/procurement" className="nav-link" data-testid="nav-approved-requests">
+            <ClipboardCheck size={20} />
+            <span>Approved Requests</span>
           </NavLink>
         )}
 

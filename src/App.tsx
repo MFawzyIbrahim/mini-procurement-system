@@ -12,6 +12,7 @@ import ApprovalDetail from './pages/approvals/ApprovalDetail';
 import OrderList from './pages/orders/OrderList';
 import OrderForm from './pages/orders/OrderForm';
 import OrderDetail from './pages/orders/OrderDetail';
+import ApprovedRequests from './pages/procurement/ApprovedRequests';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminDepartments from './pages/admin/AdminDepartments';
@@ -42,6 +43,7 @@ function App() {
             <Route path="orders" element={<OrderList />} />
             <Route path="orders/new" element={<OrderForm />} />
             <Route path="orders/:id" element={<OrderDetail />} />
+            <Route path="procurement" element={<ApprovedRequests />} />
             <Route path="admin" element={<AdminDashboard />} />
             <Route path="admin/users" element={<AdminUsers />} />
             <Route path="admin/departments" element={<AdminDepartments />} />

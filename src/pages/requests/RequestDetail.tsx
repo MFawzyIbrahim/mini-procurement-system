@@ -29,10 +29,10 @@ export default function RequestDetail() {
           
         if (reqError) throw reqError;
         
-        // Fetch requester full name
+        // Fetch requester full name — use maybeSingle so RLS block returns null, not error
         if (reqData.requester_id) {
-          const { data: profData } = await supabase.from('profiles').select('full_name').eq('id', reqData.requester_id).single();
-          reqData.requester_name = profData?.full_name || reqData.requester_id;
+          const { data: profData } = await supabase.from('profiles').select('full_name').eq('id', reqData.requester_id).maybeSingle();
+          reqData.requester_name = profData?.full_name || 'Requester Name Unavailable';
         }
         setRequest(reqData);
 
@@ -59,7 +59,7 @@ export default function RequestDetail() {
             const { data: profs } = await supabase.from('profiles').select('id, full_name').in('id', approverIds);
             const profMap = profs?.reduce((acc: any, p: any) => { acc[p.id] = p.full_name; return acc; }, {}) || {};
             approvalsRes.forEach(a => {
-              a.approver_name = profMap[a.approver_id] || a.approver_id;
+              a.approver_name = profMap[a.approver_id] || 'Approver Name Unavailable';
             });
           }
           setApprovals(approvalsRes);

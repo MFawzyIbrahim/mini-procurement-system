@@ -50,9 +50,9 @@ export default function ApprovalDetail() {
             .select('full_name')
             .eq('id', reqData.requester_id)
             .maybeSingle();
-          reqData.requester_name = profData?.full_name || 'Requester';
+          reqData.requester_name = profData?.full_name || 'Requester Name Unavailable';
         } else {
-          reqData.requester_name = 'Requester';
+          reqData.requester_name = 'Requester Name Unavailable';
         }
         setRequest(reqData);
 
@@ -233,7 +233,7 @@ export default function ApprovalDetail() {
                 {/* Never render a raw UUID — UUID pattern check as final safety net */}
                 {(request.requester_name && !/^[0-9a-f-]{36}$/i.test(request.requester_name))
                   ? request.requester_name
-                  : 'Requester'} ({request.departments?.name || '—'})
+                  : 'Requester Name Unavailable'} ({request.departments?.name || '—'})
               </p>
             </div>
             <div>
