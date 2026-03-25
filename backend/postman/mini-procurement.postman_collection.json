@@ -1,0 +1,276 @@
+{
+	"info": {
+		"name": "Mini Procurement System API",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "01. Auth",
+			"item": [
+				{
+					"name": "Supabase Login (Password Grant)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData.access_token) {",
+									"    pm.environment.set(\"access_token\", jsonData.access_token);",
+									"    pm.environment.set(\"user_id\", jsonData.user.id);",
+									"    console.log(\"Access Token stored in environment.\");",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "apikey", "value": "{{supabase_anon_key}}" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"{{test_email}}\",\n    \"password\": \"{{test_password}}\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": {
+							"raw": "{{supabase_url}}/auth/v1/token?grant_type=password",
+							"host": ["{{supabase_url}}"],
+							"path": ["auth", "v1", "token"],
+							"query": [{ "key": "grant_type", "value": "password" }]
+						}
+					}
+				},
+				{
+					"name": "GET /auth/me",
+					"request": {
+						"method": "GET",
+						"url": { "raw": "{{base_url}}/auth/me", "host": ["{{base_url}}"], "path": ["auth", "me"] }
+					}
+				}
+			]
+		},
+		{
+			"name": "02. Requests",
+			"item": [
+				{
+					"name": "GET /requests",
+					"request": {
+						"method": "GET",
+						"url": { "raw": "{{base_url}}/requests", "host": ["{{base_url}}"], "path": ["requests"] }
+					}
+				},
+				{
+					"name": "POST /requests (Create Draft)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData.id) {",
+									"    pm.environment.set(\"request_id\", jsonData.id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"needed_by_date\": \"2026-05-01\",\n    \"supplier_name\": \"Postman Supplier\",\n    \"currency_code\": \"USD\",\n    \"notes\": \"Test request via Postman\",\n    \"items\": [\n        {\n            \"item_name\": \"Test Item\",\n            \"description\": \"Item Specs\",\n            \"quantity\": 2,\n            \"unit_price\": 50.00,\n            \"tax_percent\": 15\n        }\n    ]\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/requests", "host": ["{{base_url}}"], "path": ["requests"] }
+					}
+				},
+				{
+					"name": "GET /requests/:id",
+					"request": {
+						"method": "GET",
+						"url": { "raw": "{{base_url}}/requests/{{request_id}}", "host": ["{{base_url}}"], "path": ["requests", "{{request_id}}"] }
+					}
+				},
+				{
+					"name": "PATCH /requests/:id (Update Draft)",
+					"request": {
+						"method": "PATCH",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"needed_by_date\": \"2026-06-01\",\n    \"supplier_name\": \"Updated Supplier\",\n    \"currency_code\": \"USD\",\n    \"notes\": \"Updated via Postman\",\n    \"items\": [\n        {\n            \"item_name\": \"Updated Item\",\n            \"quantity\": 5,\n            \"unit_price\": 20.00\n        }\n    ]\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/requests/{{request_id}}", "host": ["{{base_url}}"], "path": ["requests", "{{request_id}}"] }
+					}
+				},
+				{
+					"name": "POST /requests/:id/submit",
+					"request": {
+						"method": "POST",
+						"url": { "raw": "{{base_url}}/requests/{{request_id}}/submit", "host": ["{{base_url}}"], "path": ["requests", "{{request_id}}", "submit"] }
+					}
+				}
+			]
+		},
+		{
+			"name": "03. Approvals",
+			"item": [
+				{
+					"name": "GET /approvals (Inbox)",
+					"request": {
+						"method": "GET",
+						"url": { "raw": "{{base_url}}/approvals", "host": ["{{base_url}}"], "path": ["approvals"] }
+					}
+				},
+				{
+					"name": "GET /approvals/:id",
+					"request": {
+						"method": "GET",
+						"url": { "raw": "{{base_url}}/approvals/{{request_id}}", "host": ["{{base_url}}"], "path": ["approvals", "{{request_id}}"] }
+					}
+				},
+				{
+					"name": "POST /approvals/:id/approve",
+					"request": {
+						"method": "POST",
+						"url": { "raw": "{{base_url}}/approvals/{{request_id}}/approve", "host": ["{{base_url}}"], "path": ["approvals", "{{request_id}}", "approve"] }
+					}
+				},
+				{
+					"name": "POST /approvals/:id/reject",
+					"request": {
+						"method": "POST",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"reason\": \"Insufficient budget allocated for this quarter.\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/approvals/{{request_id}}/reject", "host": ["{{base_url}}"], "path": ["approvals", "{{request_id}}", "reject"] }
+					}
+				}
+			]
+		},
+		{
+			"name": "04. Procurement / Purchase Orders",
+			"item": [
+				{
+					"name": "GET /procurement/approved-requests",
+					"request": {
+						"method": "GET",
+						"url": { "raw": "{{base_url}}/procurement/approved-requests", "host": ["{{base_url}}"], "path": ["procurement", "approved-requests"] }
+					}
+				},
+				{
+					"name": "POST /purchase-orders/from-request/:requestId",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData.id) {",
+									"    pm.environment.set(\"purchase_order_id\", jsonData.id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"po_no\": \"PO-{{$randomInt}}\",\n    \"supplier_name\": \"Verified Supplier\",\n    \"total_amount\": 100.00\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/purchase-orders/from-request/{{request_id}}", "host": ["{{base_url}}"], "path": ["purchase-orders", "from-request", "{{request_id}}"] }
+					}
+				},
+				{
+					"name": "GET /purchase-orders",
+					"request": {
+						"method": "GET",
+						"url": { "raw": "{{base_url}}/purchase-orders", "host": ["{{base_url}}"], "path": ["purchase-orders"] }
+					}
+				},
+				{
+					"name": "GET /purchase-orders/:id (Detail)",
+					"request": {
+						"method": "GET",
+						"url": { "raw": "{{base_url}}/purchase-orders/{{purchase_order_id}}", "host": ["{{base_url}}"], "path": ["purchase-orders", "{{purchase_order_id}}"] }
+					}
+				},
+				{
+					"name": "POST /purchase-orders/:id/issue",
+					"request": {
+						"method": "POST",
+						"url": { "raw": "{{base_url}}/purchase-orders/{{purchase_order_id}}/issue", "host": ["{{base_url}}"], "path": ["purchase-orders", "{{purchase_order_id}}", "issue"] }
+					}
+				}
+			]
+		},
+		{
+			"name": "05. Admin",
+			"item": [
+				{
+					"name": "GET /admin/users",
+					"request": {
+						"method": "GET",
+						"url": { "raw": "{{base_url}}/admin/users", "host": ["{{base_url}}"], "path": ["admin", "users"] }
+					}
+				},
+				{
+					"name": "PATCH /admin/users/:id",
+					"request": {
+						"method": "PATCH",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"role_code\": \"APPROVER\",\n    \"is_active\": true\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/admin/users/{{user_id}}", "host": ["{{base_url}}"], "path": ["admin", "users", "{{user_id}}"] }
+					}
+				},
+				{
+					"name": "GET /admin/departments",
+					"request": {
+						"method": "GET",
+						"url": { "raw": "{{base_url}}/admin/departments", "host": ["{{base_url}}"], "path": ["admin", "departments"] }
+					}
+				},
+				{
+					"name": "POST /admin/departments",
+					"request": {
+						"method": "POST",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"code\": \"EXT\",\n    \"name\": \"External Relations\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/admin/departments", "host": ["{{base_url}}"], "path": ["admin", "departments"] }
+					}
+				}
+			]
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{ "key": "token", "value": "{{access_token}}", "type": "string" }
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": { "type": "text/javascript", "exec": [""] }
+		},
+		{
+			"listen": "test",
+			"script": { "type": "text/javascript", "exec": [""] }
+		}
+	]
+}
