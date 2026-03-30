@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, UseGuards, Request as Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { SupabaseGuard } from '../auth/supabase.guard';
 import { ApprovalsService } from './approvals.service';
@@ -31,14 +31,14 @@ export class ApprovalsController {
   @Post(':id/approve')
   @ApiOperation({ summary: 'Approve a purchase request' })
   @ApiResponse({ status: 200, type: ApprovalActionResponseDto })
-  async approve(@Param('id') id: string, @CurrentUser() user: any) {
-    return this.approvalsService.approve(id, user);
+  async approve(@Param('id') id: string, @CurrentUser() user: any, @Req() req: any) {
+    return this.approvalsService.approve(id, user, req.accessToken);
   }
 
   @Post(':id/reject')
   @ApiOperation({ summary: 'Reject a purchase request with a mandatory reason' })
   @ApiResponse({ status: 200, type: ApprovalActionResponseDto })
-  async reject(@Param('id') id: string, @Body() dto: RejectRequestDto, @CurrentUser() user: any) {
-    return this.approvalsService.reject(id, dto.reason, user);
+  async reject(@Param('id') id: string, @Body() dto: RejectRequestDto, @CurrentUser() user: any, @Req() req: any) {
+    return this.approvalsService.reject(id, dto.reason, user, req.accessToken);
   }
 }

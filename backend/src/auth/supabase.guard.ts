@@ -59,6 +59,7 @@ export class SupabaseGuard implements CanActivate {
 
       // Populate request with verified user data
       request.user = profile;
+      request.accessToken = token;
       return true;
     } catch (err: any) {
       this.logger.error(`Token verification failed: ${err.message}`);

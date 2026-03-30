@@ -3,7 +3,7 @@ import { SupabaseService } from '../supabase/supabase.service';
 
 @Injectable()
 export class ApprovalsService {
-  constructor(private supabaseService: SupabaseService) {}
+  constructor(private supabaseService: SupabaseService) { }
 
   async getInbox(user: any) {
     if (user.role_code !== 'APPROVER' && user.role_code !== 'ADMIN') {
@@ -14,7 +14,7 @@ export class ApprovalsService {
     let query = client
       .from('purchase_requests')
       .select('*, profiles(full_name), departments(name)')
-      .eq('status', 'Pending Approval');
+      .eq('status', 'Submitted');
 
     // Approvers only see their own department's pending requests
     if (user.role_code === 'APPROVER') {
@@ -54,11 +54,29 @@ export class ApprovalsService {
     return request;
   }
 
-  async approve(id: string, user: any) {
-    const client = this.supabaseService.getClient();
-    
-    // Call existing RPC: approve_request(p_request_id uuid)
-    const { data, error } = await client.rpc('approve_request', {
+  async approve(id: string, user: any, accessToken: string) {
+    const serviceClient = this.supabaseService.getClient();
+
+    // 1. Pre-check: Request exists and is in Submitted state
+    const { data: request, error: fetchError } = await serviceClient
+      .from('purchase_requests')
+      .select('status, department_id')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !request) throw new NotFoundException('Purchase request not found');
+    if (request.status !== 'Submitted') {
+      throw new BadRequestException(`Request is in ${request.status} state, not Submitted`);
+    }
+
+    // 2. Pre-check: APPROVER belongs to the same department
+    if (user.role_code === 'APPROVER' && request.department_id !== user.department_id) {
+      throw new ForbiddenException('You can only approve requests from your own department');
+    }
+
+    // 3. Call RPC using user-scoped client to provide auth context (auth.uid())
+    const userClient = this.supabaseService.getUserClient(accessToken);
+    const { data, error } = await userClient.rpc('approve_request', {
       p_request_id: id
     });
 
@@ -66,11 +84,29 @@ export class ApprovalsService {
     return { success: true, data };
   }
 
-  async reject(id: string, reason: string, user: any) {
-    const client = this.supabaseService.getClient();
-    
-    // Call existing RPC: reject_request(p_request_id uuid, p_reason text)
-    const { data, error } = await client.rpc('reject_request', {
+  async reject(id: string, reason: string, user: any, accessToken: string) {
+    const serviceClient = this.supabaseService.getClient();
+
+    // 1. Pre-check: Request exists and is in Submitted state
+    const { data: request, error: fetchError } = await serviceClient
+      .from('purchase_requests')
+      .select('status, department_id')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !request) throw new NotFoundException('Purchase request not found');
+    if (request.status !== 'Submitted') {
+      throw new BadRequestException(`Request is in ${request.status} state, not Submitted`);
+    }
+
+    // 2. Pre-check: APPROVER belongs to the same department
+    if (user.role_code === 'APPROVER' && request.department_id !== user.department_id) {
+      throw new ForbiddenException('You can only reject requests from your own department');
+    }
+
+    // 3. Call RPC using user-scoped client to provide auth context (auth.uid())
+    const userClient = this.supabaseService.getUserClient(accessToken);
+    const { data, error } = await userClient.rpc('reject_request', {
       p_request_id: id,
       p_reason: reason
     });

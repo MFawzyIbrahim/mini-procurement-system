@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: mini-procurement-backend
+    runtime: node
+    rootDir: backend
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm run start:prod
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: PUBLIC_API_URL
+        value: https://YOUR_RENDER_BACKEND_DOMAIN.onrender.com
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
